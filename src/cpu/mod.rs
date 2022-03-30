@@ -2,6 +2,12 @@
 //!
 //! Parallelisation is done using the farming pattern
 
+#[cfg(test)]
+#[test]
+fn test_aes_encrypt() {
+	todo!();
+}
+
 /// Perform AES-128/CTR encryption on slice `data` using slice `key` (`key` having gone through necessary key derivation and being exactly 128-bit)
 ///
 /// This function will panic if used on an architecture that is not x86/x86_64 and when AES-NI isn't available
