@@ -36,6 +36,7 @@ impl<F: FnOnce()> FnOnceBox for F {
 type Task = Box<dyn FnOnceBox + Send + 'static>;
 
 /// Message enum for passing to worker threads. 2 variants: NewTask and Terminate
+#[allow(dead_code)]
 enum Message {
 	NewTask(Task),
 	Terminate
@@ -48,6 +49,7 @@ struct Worker {
 
 impl Worker {
 	/// Creates a thread that waits for messages and acts appropriately upon reception of them. The thread also decrements `num_tasks` when a task is completed and notifies `await_condvar`'s Condvar
+	#[allow(dead_code)]
 	fn new(reciever: Arc<Mutex<mpsc::Receiver<Message>>>, await_condvar: Arc<(Condvar, Mutex<()>)>, num_tasks: Arc<AtomicUsize>) -> Self {
 		Worker {
 			thread: Some(thread::spawn(move || {
@@ -71,6 +73,7 @@ impl Worker {
 	}
 }
 
+#[allow(dead_code)]
 pub struct ThreadPool {
 	workers: Vec<Worker>,
 	sender: mpsc::Sender<Message>,
@@ -78,6 +81,7 @@ pub struct ThreadPool {
 	await_condvar: Arc<(Condvar, Mutex<()>)>
 }
 
+#[allow(dead_code)]
 impl ThreadPool {
 	/// Construct a ThreadPool with a number of worker threads equal to the return value of `std::thread::available_parallelism` if `Some`, or if `None`, then 4
 	pub fn new() -> Self {
