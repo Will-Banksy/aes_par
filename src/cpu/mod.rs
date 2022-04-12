@@ -3,9 +3,10 @@
 //! Parallelisation is done using the farming pattern
 
 #[cfg(target_arch = "x86")]
-use core::arch::x86::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32};
+use core::arch::x86::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32, _mm_slli_si128, _mm_loadu_si128};
 #[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32};
+use core::arch::x86_64::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32, _mm_slli_si128, _mm_loadu_si128};
+use std::arch::x86_64::_mm_xor_si128;
 
 mod thread_pool;
 
@@ -49,47 +50,47 @@ fn test_aes_encrypt() {
 
 #[test]
 fn test_key_expansion_intrinsic() {
-	let k: u128 = 0x5468617473206D79204B756E67204675;//0x000102030405060708090a0b0c0d0e0f;
+	let k: u128 = 0x2b7e151628aed2a6abf7158809cf4f3c;//0x5468617473206D79204B756E67204675;//0x000102030405060708090a0b0c0d0e0f;
 
 	// FIXME: Need to get both implementations of the key schedule to produce the same result
 
+	// INCORRECT
 	let aesni_res = unsafe {
 		const RCON0: i32 = (RCON[0] >> 24) as i32; // Remove the right zero padding cause _mm_aeskeygenassist_si128 does that
 
-		let mut xmm1 = k;
-		let xmm2 = _mm_aeskeygenassist_si128::<RCON0>(to_sse_128(xmm1));
+		assert_eq!(RCON0, 1);
 
-		let xmm2: u128 = from_sse_128(_mm_shuffle_epi32::<0xff>(xmm2));
+		let mut xmm1 = to_sse_128(k);
+		let mut xmm2 = _mm_aeskeygenassist_si128::<RCON0>(xmm1);
+		let mut xmm3: __m128i;
 
-		let mut xmm3 = xmm1 << 4;
-		xmm1 ^= xmm3;
-		xmm3 = xmm1 << 4;
-		xmm1 ^= xmm3;
-		xmm3 = xmm1 << 4;
-		xmm1 ^= xmm3;
-		xmm1 ^= xmm2;
-		xmm1
+		xmm2 = _mm_shuffle_epi32::<255>(xmm2);
+		xmm3 = _mm_slli_si128::<4>(xmm1);
+		xmm1 = _mm_xor_si128(xmm1, xmm3);
+		xmm3 = _mm_slli_si128::<4>(xmm3);
+		xmm1 = _mm_xor_si128(xmm1, xmm3);
+		xmm3 = _mm_slli_si128::<4>(xmm3);
+		xmm1 = _mm_xor_si128(xmm1, xmm3);
+		xmm1 = _mm_xor_si128(xmm1, xmm2);
+
+		from_sse_128(xmm1)
 	};
 
+	// CORRECT
 	let aesrs_res = {
 		const RCON0: u32 = RCON[0];
 
-		// FIXME: Byte ordering
-		// What bytes go where and are what
-		// Just got myself a bit confused
-		// aaa
+		let k3 = k as u32;
+		let k2 = (k >> 32) as u32;
+		let k1 = (k >> 64) as u32;
+		let k0 = (k >> 96) as u32;
 
-		let k0 = k as u32;
-		let k1 = (k >> 32) as u32;
-		let k2 = (k >> 64) as u32;
-		let k3 = (k >> 96) as u32;
+		let w0 = k0 ^ sub_word(k3.rotate_left(8)) ^ RCON0;
+		let w1 = k1 ^ w0;
+		let w2 = k2 ^ w1;
+		let w3 = k3 ^ w2;
 
-		let w3 = k3 ^ sub_word(k0.rotate_left(8)) ^ RCON0;
-		let w2 = k2 ^ w3;
-		let w1 = k1 ^ w2;
-		let w0 = k0 ^ w1;
-
-		((w3 as u128) << 96) | ((w2 as u128) << 64) | ((w1 as u128) << 32) | (w0 as u128)
+		((w0 as u128) << 96) | ((w1 as u128) << 64) | ((w2 as u128) << 32) | (w3 as u128)
 	};
 
 	println!("AES-NI implementation: {:#x}\nPure Rust implementation: {:#x}", aesni_res, aesrs_res);
