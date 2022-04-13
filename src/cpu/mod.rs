@@ -25,10 +25,12 @@ fn test_key_expansion() {
 		0xd014f9a8c9ee2589e13f0cc8b6630ca6
 	];
 
+	// CORRECT
 	let aesni_res = unsafe {
 		simd::key_expansion(EXPECTED[0])
 	};
 
+	// CORRECT
 	let aesrs_res = sisd::key_expansion(EXPECTED[0]);
 
 	assert_eq!(aesni_res, aesrs_res, "[ERROR]: The two implementation produce different results");
@@ -42,14 +44,13 @@ fn test_cipher() {
 	const INPUT: u128 = 0x6bc1bee22e409f96e93d7e117393172a;
 	const EXPECTED: u128 = 0x3ad77bb40d7a3660a89ecaf32466ef97;
 
+	// CORRECT
 	let aesni_res = unsafe {
 		let rks = simd::key_expansion(KEY);
 		simd::cipher(INPUT, &rks)
 	};
 
-	println!("AES-NI RESULT: {:#x}", aesni_res);
-	assert_eq!(aesni_res, EXPECTED);
-
+	// TODO
 	let aesrs_res = {
 		let rks = sisd::key_expansion(KEY);
 		sisd::cipher(INPUT, &rks)
@@ -69,19 +70,9 @@ pub fn aes_encrypt<'a>(data: &'a mut [u8], key: &[u8]) -> &'a mut [u8] {
 
 	// TODO: Convert `data` into u128 slice
 
-	// Compile the block if the target architecture is x86 or x86_64
-	#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-	{
-		// Check for AES-NI
-		if is_x86_feature_detected!("aes") {
-			// TODO: Splitting `data` up into 128-bit blocks, generating the counter for each block, and giving the work to a ThreadPool instance to work on
+	// TODO: Splitting `data` up into 128-bit blocks, generating the counter for each block, and giving the work to a ThreadPool instance to work on
 
-			return data;
-		}
-	}
-
-	// A software (pure rust) fallback is not implemented and won't be in the future
-	unimplemented!();
+	todo!();
 }
 
 /// Expands one 128-bit key into 11 128-bit round keys
