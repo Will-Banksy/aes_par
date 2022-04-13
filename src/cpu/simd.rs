@@ -3,6 +3,7 @@ use core::arch::x86::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_
 #[cfg(target_arch = "x86_64")]
 use core::arch::x86_64::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32, _mm_slli_si128, _mm_xor_si128};
 
+/// Round constants; Not right padded
 const RCON: [i32; 10] = [
 	0x01,
 	0x02,
@@ -29,6 +30,7 @@ unsafe fn from_sse_128(n: __m128i) -> u128{
 }
 
 // Tested and works correctly
+/// A macro to produce the `i`th (i > 0, i <= 9) round key for AES-128 using the `_mm_aeskeygenassist_si128` intrinsic, with `key` being the previous round key (round key `i - 1`)
 macro_rules! key_expand_i {
 	($key: ident, $i: expr) => {
 		{
@@ -58,6 +60,7 @@ pub unsafe fn key_expansion(key: u128) -> [u128; 11] {
 }
 
 // Tested and works correctly
+/// Processes the output of `_mm_aeskeygenassist_si128` (`xmm2`) and the previous round key (`xmm1`) using SSE2 intrinsics to produce a round key
 #[target_feature(enable = "sse2")]
 unsafe fn key_expansion_assist(mut xmm1: __m128i, mut xmm2: __m128i) -> __m128i {
 	let mut xmm3: __m128i;

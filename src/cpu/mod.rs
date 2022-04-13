@@ -1,4 +1,4 @@
-//! This module implements parallelised AES-128/CTR on the CPU using AES-NI
+//! This module implements parallelised AES-128/CTR on the CPU, using x86/x86_64 AES-NI intrinsics if available
 //!
 //! Parallelisation is done using the farming pattern
 
@@ -8,6 +8,7 @@ mod thread_pool;
 mod simd;
 mod sisd;
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(test)]
 #[test]
 fn test_key_expansion() {
@@ -37,6 +38,7 @@ fn test_key_expansion() {
 	assert_eq!(aesni_res, EXPECTED, "[ERROR]: Both implementations produce the same result but differ from the expected result");
 }
 
+#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 #[cfg(test)]
 #[test]
 fn test_cipher() {
@@ -61,12 +63,16 @@ fn test_cipher() {
 }
 
 /// Perform AES-128/CTR encryption on slice `data` using slice `key` (`key` having gone through necessary key derivation and being exactly 128-bit)
+///
+/// This function will assume that both `data` and `key` are stored in the little-endian byte order
+///
+/// Will use x86/x86_64 AES-NI intrinsics if available
 /// # Panics
-/// This function will panic if `key` is not 128-bit or if used on an architecture that is not x86/x86_64 or when AES-NI isn't available
+/// This function will panic if `key` is not 128-bit/16-byte
 pub fn aes_encrypt<'a>(data: &'a mut [u8], key: &[u8]) -> &'a mut [u8] {
 	assert_eq!(key.len(), 16);
 
-	let key = u128::from_ne_bytes(key.try_into().unwrap());
+	let key = u128::from_le_bytes(key.try_into().unwrap());
 
 	// TODO: Convert `data` into u128 slice
 
@@ -76,6 +82,8 @@ pub fn aes_encrypt<'a>(data: &'a mut [u8], key: &[u8]) -> &'a mut [u8] {
 }
 
 /// Expands one 128-bit key into 11 128-bit round keys
+///
+/// Will use x86/x86_64 AES-NI intrinsics if available
 fn key_expansion(key: u128) -> [u128; 11] {
 	#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
 	{
@@ -88,6 +96,8 @@ fn key_expansion(key: u128) -> [u128; 11] {
 }
 
 /// Performs the cipher on a 128-bit state with 11 128-bit round keys
+///
+/// Will use x86/x86_64 AES-NI intrinsics if available
 /// # Panics
 /// This function panics if `round_keys` length is not equal to 11
 fn cipher(state: u128, round_keys: &[u128]) -> u128 {
