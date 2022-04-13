@@ -73,11 +73,12 @@ pub unsafe fn cipher(mut state: u128, round_keys: &[u128]) -> u128 {
 	assert_eq!(round_keys.len(), 11);
 
 	state ^= round_keys[0];
+
 	for i in 1..10 {
 		// Using transmute perhaps a bit excessively here, it is quite unsafe, but no more than anything you'd do in C/C++ tbf, and it does max performance
-		state = from_sse_128(_mm_aesenc_si128(to_sse_128(state), to_sse_128(round_keys[i])));
+		state = from_sse_128(_mm_aesenc_si128(to_sse_128(state.swap_bytes()), to_sse_128(round_keys[i].swap_bytes()))).swap_bytes();
 	}
-	state = from_sse_128(_mm_aesenclast_si128(to_sse_128(state), to_sse_128(round_keys[10])));
+	state = from_sse_128(_mm_aesenclast_si128(to_sse_128(state.swap_bytes()), to_sse_128(round_keys[10].swap_bytes()))).swap_bytes();
 
 	state
 }

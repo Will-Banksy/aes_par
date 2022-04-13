@@ -2,11 +2,6 @@
 //!
 //! Parallelisation is done using the farming pattern
 
-#[cfg(target_arch = "x86")]
-use core::arch::x86::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32, _mm_slli_si128, _mm_xor_si128};
-#[cfg(target_arch = "x86_64")]
-use core::arch::x86_64::{__m128i, _mm_aeskeygenassist_si128, _mm_aesenc_si128, _mm_aesenclast_si128, _mm_shuffle_epi32, _mm_slli_si128, _mm_xor_si128};
-
 mod thread_pool;
 
 #[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
@@ -15,15 +10,7 @@ mod sisd;
 
 #[cfg(test)]
 #[test]
-fn test_aes_encrypt() {
-	todo!();
-}
-
-#[cfg(any(target_arch = "x86", target_arch = "x86_64"))]
-#[cfg(test)]
-#[test]
 fn test_key_expansion() {
-	let k: u128 = 0x2b7e151628aed2a6abf7158809cf4f3c;
 	const EXPECTED: [u128; 11] = [
 		0x2b7e151628aed2a6abf7158809cf4f3c,
 		0xa0fafe1788542cb123a339392a6c7605,
@@ -39,13 +26,34 @@ fn test_key_expansion() {
 	];
 
 	let aesni_res = unsafe {
-		simd::key_expansion(k)
+		simd::key_expansion(EXPECTED[0])
 	};
 
-	let aesrs_res = sisd::key_expansion(k);
+	let aesrs_res = sisd::key_expansion(EXPECTED[0]);
 
-	// println!("AES-NI implementation: {:#x}\nPure Rust implementation: {:#x}", aesni_res[1], aesrs_res[1]);
-	// println!("Expected: {:#x}", EXPECTED);
+	assert_eq!(aesni_res, aesrs_res, "[ERROR]: The two implementation produce different results");
+	assert_eq!(aesni_res, EXPECTED, "[ERROR]: Both implementations produce the same result but differ from the expected result");
+}
+
+#[cfg(test)]
+#[test]
+fn test_cipher() {
+	const KEY: u128 = 0x2b7e151628aed2a6abf7158809cf4f3c;
+	const INPUT: u128 = 0x6bc1bee22e409f96e93d7e117393172a;
+	const EXPECTED: u128 = 0x3ad77bb40d7a3660a89ecaf32466ef97;
+
+	let aesni_res = unsafe {
+		let rks = simd::key_expansion(KEY);
+		simd::cipher(INPUT, &rks)
+	};
+
+	println!("AES-NI RESULT: {:#x}", aesni_res);
+	assert_eq!(aesni_res, EXPECTED);
+
+	let aesrs_res = {
+		let rks = sisd::key_expansion(KEY);
+		sisd::cipher(INPUT, &rks)
+	};
 
 	assert_eq!(aesni_res, aesrs_res, "[ERROR]: The two implementation produce different results");
 	assert_eq!(aesni_res, EXPECTED, "[ERROR]: Both implementations produce the same result but differ from the expected result");
