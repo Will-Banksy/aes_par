@@ -30,6 +30,21 @@ const RCON: [u32; 10] = [
 	0x36000000
 ];
 
+// Tested and works correctly
+fn ith_byte(num: u128, i: u8) -> u8 {
+	(num >> (120 - (i * 8))) as u8
+}
+
+// Tested and works correctly
+fn set_ith_byte(mut num: u128, i: u8, val: u8) -> u128 {
+	let shift = 120 - (i * 8);
+	let mask: u128 = 0xff << shift;
+	num ^= mask & num;
+	num |= (val as u128) << shift;
+	num
+}
+
+// Tested and works correctly
 pub fn key_expansion(key: u128) -> [u128; 11] {
 	let mut rks: [u128; 11] = [0; 11];
 
@@ -54,7 +69,7 @@ pub fn key_expansion(key: u128) -> [u128; 11] {
 	rks
 }
 
-// Tested and is working
+// Tested and works correctly
 fn sub_word(w: u32) -> u32 {
 	let b0 = S_BOX[(w & 0xff) as usize];
 	let b1 = S_BOX[((w >> 8) & 0xff) as usize];
@@ -67,5 +82,14 @@ fn sub_word(w: u32) -> u32 {
 pub fn cipher(mut state: u128, round_keys: &[u128]) -> u128 {
 	assert_eq!(round_keys.len(), 11);
 
+	// MSB -> LSB
+	// b0 -> b15
+
+	state ^= round_keys[0];
+
+	todo!();
+}
+
+fn sub_bytes(state: u128) -> u128 {
 	todo!();
 }
