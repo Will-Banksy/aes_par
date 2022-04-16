@@ -1,3 +1,5 @@
+use std::ptr;
+
 /// The Rijndael substitution box
 const S_BOX: [u8; 256] = [
 	0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -15,24 +17,17 @@ const S_BOX: [u8; 256] = [
 	0xba, 0x78, 0x25, 0x2e, 0x1c, 0xa6, 0xb4, 0xc6, 0xe8, 0xdd, 0x74, 0x1f, 0x4b, 0xbd, 0x8b, 0x8a,
 	0x70, 0x3e, 0xb5, 0x66, 0x48, 0x03, 0xf6, 0x0e, 0x61, 0x35, 0x57, 0xb9, 0x86, 0xc1, 0x1d, 0x9e,
 	0xe1, 0xf8, 0x98, 0x11, 0x69, 0xd9, 0x8e, 0x94, 0x9b, 0x1e, 0x87, 0xe9, 0xce, 0x55, 0x28, 0xdf,
-	0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16
+	0x8c, 0xa1, 0x89, 0x0d, 0xbf, 0xe6, 0x42, 0x68, 0x41, 0x99, 0x2d, 0x0f, 0xb0, 0x54, 0xbb, 0x16,
 ];
 
 /// Round constants; Right padded with 3 bytes of 0x00
 const RCON: [u32; 10] = [
-	0x01000000,
-	0x02000000,
-	0x04000000,
-	0x08000000,
-	0x10000000,
-	0x20000000,
-	0x40000000,
-	0x80000000,
-	0x1b000000,
-	0x36000000
+	0x01000000, 0x02000000, 0x04000000, 0x08000000, 0x10000000, 0x20000000, 0x40000000, 0x80000000,
+	0x1b000000, 0x36000000,
 ];
 
 // Tested and works correctly
+/// Gets the value of byte `i` in `num` with 0 being the most significant byte and 15 the least
 fn ith_byte(num: u128, i: u8) -> u8 {
 	(num >> (120 - (i * 8))) as u8
 }
@@ -88,10 +83,68 @@ pub fn cipher(mut state: u128, round_keys: &[u128]) -> u128 {
 	// b0 -> b15
 
 	state ^= round_keys[0];
+	for i in 1..10 {
+		state = sub_bytes(state);
+		state = shift_rows(state);
+		state = mix_columns(state);
+		state ^= round_keys[i];
+	}
+	state = sub_bytes(state);
+	state = shift_rows(state);
+	state ^= round_keys[10];
 
-	todo!();
+	state
 }
 
 fn sub_bytes(state: u128) -> u128 {
-	todo!();
+	// TODO: This is probably horrifically badly performing I should just use bitmasks or something. Decide on how to handle this
+	u128::from_le_bytes(
+		state
+			.to_le_bytes()
+			.iter()
+			.map(|b| S_BOX[*b as usize])
+			.collect::<Vec<u8>>()
+			.try_into()
+			.unwrap(),
+	)
+}
+
+fn shift_rows(state: u128) -> u128 {
+	// State is a column-major 2D array of bytes
+	let mut state: [u8; 16] = state
+		.to_le_bytes()
+		.into_iter()
+		.collect::<Vec<u8>>()
+		.try_into()
+		.unwrap();
+
+	for i in 1..4 {
+		// i is the move amount
+		// i is also the index of the first element of the row, the second being i + 4, the third i + 8, and the fourth i + 12
+		if i == 1 {
+			// Using unsafe block cause I need to use ptr::swap instead of mem::swap cause I can't use references cause I can't take 2 mutable references to a single slice
+			unsafe {
+				ptr::swap(&mut state[i], &mut state[i + 4]);
+				ptr::swap(&mut state[i + 4], &mut state[i + 8]);
+				ptr::swap(&mut state[i + 8], &mut state[i + 12]);
+			}
+		} else if i == 2 {
+			unsafe {
+				ptr::swap(&mut state[i], &mut state[i + 8]);
+				ptr::swap(&mut state[i + 4], &mut state[i + 12]);
+			}
+		} else if i == 3 {
+			unsafe {
+				ptr::swap(&mut state[i], &mut state[i + 12]);
+				ptr::swap(&mut state[i + 12], &mut state[i + 8]);
+				ptr::swap(&mut state[i + 8], &mut state[i + 4]);
+			}
+		}
+	}
+	u128::from_le_bytes(state)
+}
+
+fn mix_columns(state: u128) -> u128 {
+	//  Remember state is a column-major 2D array of bytes
+	todo!(); // TODO: Implement
 }

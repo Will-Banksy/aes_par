@@ -12,6 +12,7 @@ mod sisd;
 #[cfg(test)]
 #[test]
 fn test_key_expansion() {
+	const KEY: u128 = 0x2b7e151628aed2a6abf7158809cf4f3c;
 	const EXPECTED: [u128; 11] = [
 		0x2b7e151628aed2a6abf7158809cf4f3c,
 		0xa0fafe1788542cb123a339392a6c7605,
@@ -28,11 +29,11 @@ fn test_key_expansion() {
 
 	// CORRECT
 	let aesni_res = unsafe {
-		simd::key_expansion(EXPECTED[0])
+		simd::key_expansion(KEY)
 	};
 
 	// CORRECT
-	let aesrs_res = sisd::key_expansion(EXPECTED[0]);
+	let aesrs_res = sisd::key_expansion(KEY);
 
 	assert_eq!(aesni_res, aesrs_res, "[ERROR]: The two implementation produce different results");
 	assert_eq!(aesni_res, EXPECTED, "[ERROR]: Both implementations produce the same result but differ from the expected result");
@@ -52,7 +53,7 @@ fn test_cipher() {
 		simd::cipher(INPUT, &rks)
 	};
 
-	// TODO
+	// CORRECT
 	let aesrs_res = {
 		let rks = sisd::key_expansion(KEY);
 		sisd::cipher(INPUT, &rks)
