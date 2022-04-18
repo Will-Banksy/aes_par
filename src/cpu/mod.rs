@@ -43,9 +43,9 @@ fn test_key_expansion() {
 #[cfg(test)]
 #[test]
 fn test_cipher() {
-	const KEY: u128 = 0x2b7e151628aed2a6abf7158809cf4f3c;
-	const INPUT: u128 = 0x6bc1bee22e409f96e93d7e117393172a;
-	const EXPECTED: u128 = 0x3ad77bb40d7a3660a89ecaf32466ef97;
+	const KEY: u128 = 0x2b7e151628aed2a6abf7158809cf4f3c;//0x5468617473206D79204B756E67204675;
+	const INPUT: u128 = 0x6bc1bee22e409f96e93d7e117393172a;//0x54776F204F6E65204E696E652054776F;
+	const EXPECTED: u128 = 0x3ad77bb40d7a3660a89ecaf32466ef97;//0x0;
 
 	// CORRECT
 	let aesni_res = unsafe {
@@ -53,7 +53,7 @@ fn test_cipher() {
 		simd::cipher(INPUT, &rks)
 	};
 
-	// CORRECT
+	// INCORRECT
 	let aesrs_res = {
 		let rks = sisd::key_expansion(KEY);
 		sisd::cipher(INPUT, &rks)

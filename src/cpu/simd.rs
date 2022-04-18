@@ -17,19 +17,16 @@ const RCON: [i32; 10] = [
 	0x36
 ];
 
-// Tested and works correctly
 /// Transforms a rust u128 to an SSE __m128i using std::mem::transmute (no idea if there is a better way to do it)
 unsafe fn to_sse_128(n: u128) -> __m128i {
 	std::mem::transmute(n)
 }
 
-// Tested and works correctly
 /// Transforms a SSE __m128i to a rust u128 using std::mem::transmute (no idea if there is a better way to do it)
 unsafe fn from_sse_128(n: __m128i) -> u128{
 	std::mem::transmute(n)
 }
 
-// Tested and works correctly
 /// A macro to produce the `i`th (i > 0, i <= 9) round key for AES-128 using the `_mm_aeskeygenassist_si128` intrinsic, with `key` being the previous round key (round key `i - 1`)
 macro_rules! key_expand_i {
 	($key: ident, $i: expr) => {
@@ -41,7 +38,6 @@ macro_rules! key_expand_i {
 	};
 }
 
-// Tested and works correctly
 #[target_feature(enable = "aes")]
 pub unsafe fn key_expansion(key: u128) -> [u128; 11] {
 	let rk0 = key;
@@ -59,7 +55,6 @@ pub unsafe fn key_expansion(key: u128) -> [u128; 11] {
 	[ rk0, rk1, rk2, rk3, rk4, rk5, rk6, rk7, rk8, rk9, rk10 ]
 }
 
-// Tested and works correctly
 /// Processes the output of `_mm_aeskeygenassist_si128` (`xmm2`) and the previous round key (`xmm1`) using SSE2 intrinsics to produce a round key
 #[target_feature(enable = "sse2")]
 unsafe fn key_expansion_assist(mut xmm1: __m128i, mut xmm2: __m128i) -> __m128i {
@@ -76,7 +71,6 @@ unsafe fn key_expansion_assist(mut xmm1: __m128i, mut xmm2: __m128i) -> __m128i 
 	xmm1
 }
 
-// Tested and works correctly
 #[target_feature(enable = "aes")]
 pub unsafe fn cipher(state: u128, round_keys: &[u128]) -> u128 {
 	assert_eq!(round_keys.len(), 11);

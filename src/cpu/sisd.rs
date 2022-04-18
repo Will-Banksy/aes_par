@@ -1,5 +1,11 @@
 use std::ptr;
 
+use gf256::gf::gf;
+
+#[gf(polynomial=0x11b, generator=0x3, barret)]
+/// u8 in GF(2^8)
+type gf256_aes;
+
 /// The Rijndael substitution box
 const S_BOX: [u8; 256] = [
 	0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76,
@@ -26,13 +32,12 @@ const RCON: [u32; 10] = [
 	0x1b000000, 0x36000000,
 ];
 
-// Tested and works correctly
 /// Gets the value of byte `i` in `num` with 0 being the most significant byte and 15 the least
 fn ith_byte(num: u128, i: u8) -> u8 {
 	(num >> (120 - (i * 8))) as u8
 }
 
-// Tested and works correctly
+/// Sets the value of byte `i` in `num` to `val` with 0 being the most significant byte and 15 the least
 fn set_ith_byte(mut num: u128, i: u8, val: u8) -> u128 {
 	let shift = 120 - (i * 8);
 	let mask: u128 = 0xff << shift;
@@ -41,7 +46,6 @@ fn set_ith_byte(mut num: u128, i: u8, val: u8) -> u128 {
 	num
 }
 
-// Tested and works correctly
 pub fn key_expansion(key: u128) -> [u128; 11] {
 	let mut rks: [u128; 11] = [0; 11];
 
@@ -66,7 +70,6 @@ pub fn key_expansion(key: u128) -> [u128; 11] {
 	rks
 }
 
-// Tested and works correctly
 fn sub_word(w: u32) -> u32 {
 	let b0 = S_BOX[(w & 0xff) as usize];
 	let b1 = S_BOX[((w >> 8) & 0xff) as usize];
@@ -98,9 +101,9 @@ pub fn cipher(mut state: u128, round_keys: &[u128]) -> u128 {
 
 fn sub_bytes(state: u128) -> u128 {
 	// TODO: This is probably horrifically badly performing I should just use bitmasks or something. Decide on how to handle this
-	u128::from_le_bytes(
+	u128::from_be_bytes(
 		state
-			.to_le_bytes()
+			.to_be_bytes()
 			.iter()
 			.map(|b| S_BOX[*b as usize])
 			.collect::<Vec<u8>>()
@@ -112,7 +115,7 @@ fn sub_bytes(state: u128) -> u128 {
 fn shift_rows(state: u128) -> u128 {
 	// State is a column-major 2D array of bytes
 	let mut state: [u8; 16] = state
-		.to_le_bytes()
+		.to_be_bytes()
 		.into_iter()
 		.collect::<Vec<u8>>()
 		.try_into()
@@ -141,10 +144,84 @@ fn shift_rows(state: u128) -> u128 {
 			}
 		}
 	}
-	u128::from_le_bytes(state)
+	u128::from_be_bytes(state)
+}
+
+/// Using normal bit numbering - MSB = b7, LSB = b0
+fn ith_bit(b: u8, i: u8) -> bool {
+	(b >> i) & 0x1 == 1
+}
+
+/// Using normal bit numbering - MSB = b7, LSB = b0
+fn set_ith_bit(b: u8, i: u8, val: bool) -> u8 {
+	if val {
+		let val: u8 = 0x1 << i;
+		b | val
+	} else {
+		let val: u8 = 0x1 << i;
+		b & !val
+	}
+}
+
+// FIXME: Fix this finite field arithmetic multiply function to multiply two numbers in GF(2^8)
+// Not necessarily gonna use this function I just want it working so that I can easily translate this code to other languages
+/// Performs multiplication in the finite field GF(2^8) with bitshifts, xor, and
+fn ffa_mul(a: u8, b: u8) -> u8 {
+	const BOUNDING_IRREDUCIBLE_POLYNOMIAL: u8 = 0x1b;
+
+	let mut c: u8 = 0;
+
+	for i in 0..8 {
+		if ith_bit(c, 7) {
+			c ^= BOUNDING_IRREDUCIBLE_POLYNOMIAL;
+		}
+		c <<= 2;
+		if ith_bit(b, i) {
+			c ^= a;
+		}
+	}
+
+	c
+}
+
+#[cfg(test)]
+#[test]
+fn test_ffa_mult() {
+	const NUM0: u8 = 0b01101001;
+	const NUM1: u8 = 0b00101001;
+	const EXPECTED: u8 = 0b10000011;
+
+	assert_eq!(ffa_mul(NUM0, NUM1), EXPECTED);
 }
 
 fn mix_columns(state: u128) -> u128 {
-	//  Remember state is a column-major 2D array of bytes
-	todo!(); // TODO: Implement
+	// Remember state is a column-major 2D array of bytes
+
+	let mut state: [u8; 16] = state
+		.to_be_bytes()
+		.into_iter()
+		.collect::<Vec<u8>>()
+		.try_into()
+		.unwrap();
+
+	for i in 0..4 {
+		// i is the column index
+
+		let a0 = gf256_aes(state[(i * 4)]);
+		let a1 = gf256_aes(state[(i * 4) + 1]);
+		let a2 = gf256_aes(state[(i * 4) + 2]);
+		let a3 = gf256_aes(state[(i * 4) + 3]);
+
+		let a0_res = gf256_aes(2) * a0 + gf256_aes(3) * a1 + a2                + a3;
+		let a1_res = a0                + gf256_aes(2) * a1 + gf256_aes(3) * a2 + a3;
+		let a2_res = a0                + a1                + gf256_aes(2) * a2 + gf256_aes(3) * a3;
+		let a3_res = gf256_aes(3) * a0 + a1                + a2                + gf256_aes(2) * a3;
+
+		state[(i * 4)] = a0_res.get();
+		state[(i * 4) + 1] = a1_res.get();
+		state[(i * 4) + 2] = a2_res.get();
+		state[(i * 4) + 3] = a3_res.get();
+	}
+
+	u128::from_be_bytes(state)
 }
