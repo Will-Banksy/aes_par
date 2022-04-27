@@ -31,9 +31,9 @@ unsafe fn from_sse_128(n: __m128i) -> u128{
 macro_rules! key_expand_i {
 	($key: ident, $i: expr) => {
 		{
-			let xmm1 = to_sse_128($key.swap_bytes()); // Reverse byte order for processing
+			let xmm1 = to_sse_128($key.to_be()); // Reverse byte order for processing
 			let xmm2 = _mm_aeskeygenassist_si128::<{RCON[$i]}>(xmm1);
-			from_sse_128(key_expansion_assist(xmm1, xmm2)).swap_bytes()
+			from_sse_128(key_expansion_assist(xmm1, xmm2)).to_be()
 		}
 	};
 }
@@ -75,13 +75,13 @@ unsafe fn key_expansion_assist(mut xmm1: __m128i, mut xmm2: __m128i) -> __m128i 
 pub unsafe fn cipher(state: u128, round_keys: &[u128]) -> u128 {
 	assert_eq!(round_keys.len(), 11);
 
-	let mut state = to_sse_128(state.swap_bytes());
+	let mut state = to_sse_128(state.to_be());
 
-	state = _mm_xor_si128(state, to_sse_128(round_keys[0].swap_bytes()));
+	state = _mm_xor_si128(state, to_sse_128(round_keys[0].to_be()));
 	for i in 1..10 {
-		state = _mm_aesenc_si128(state, to_sse_128(round_keys[i].swap_bytes()));
+		state = _mm_aesenc_si128(state, to_sse_128(round_keys[i].to_be()));
 	}
-	state = _mm_aesenclast_si128(state, to_sse_128(round_keys[10].swap_bytes()));
+	state = _mm_aesenclast_si128(state, to_sse_128(round_keys[10].to_be()));
 
-	from_sse_128(state).swap_bytes()
+	from_sse_128(state).to_be()
 }

@@ -32,20 +32,6 @@ const RCON: [u32; 10] = [
 	0x1b000000, 0x36000000,
 ];
 
-/// Gets the value of byte `i` in `num` with 0 being the most significant byte and 15 the least
-fn ith_byte(num: u128, i: u8) -> u8 {
-	(num >> (120 - (i * 8))) as u8
-}
-
-/// Sets the value of byte `i` in `num` to `val` with 0 being the most significant byte and 15 the least
-fn set_ith_byte(mut num: u128, i: u8, val: u8) -> u128 {
-	let shift = 120 - (i * 8);
-	let mask: u128 = 0xff << shift;
-	num ^= mask & num;
-	num |= (val as u128) << shift;
-	num
-}
-
 pub fn key_expansion(key: u128) -> [u128; 11] {
 	let mut rks: [u128; 11] = [0; 11];
 
@@ -145,53 +131,6 @@ fn shift_rows(state: u128) -> u128 {
 		}
 	}
 	u128::from_be_bytes(state)
-}
-
-/// Using normal bit numbering - MSB = b7, LSB = b0
-fn ith_bit(b: u8, i: u8) -> bool {
-	(b >> i) & 0x1 == 1
-}
-
-/// Using normal bit numbering - MSB = b7, LSB = b0
-fn set_ith_bit(b: u8, i: u8, val: bool) -> u8 {
-	if val {
-		let val: u8 = 0x1 << i;
-		b | val
-	} else {
-		let val: u8 = 0x1 << i;
-		b & !val
-	}
-}
-
-// FIXME: Fix this finite field arithmetic multiply function to multiply two numbers in GF(2^8)
-// Not necessarily gonna use this function I just want it working so that I can easily translate this code to other languages
-/// Performs multiplication in the finite field GF(2^8) with bitshifts, xor, and
-fn ffa_mul(a: u8, b: u8) -> u8 {
-	const BOUNDING_IRREDUCIBLE_POLYNOMIAL: u8 = 0x1b;
-
-	let mut c: u8 = 0;
-
-	for i in 0..8 {
-		if ith_bit(c, 7) {
-			c ^= BOUNDING_IRREDUCIBLE_POLYNOMIAL;
-		}
-		c <<= 2;
-		if ith_bit(b, i) {
-			c ^= a;
-		}
-	}
-
-	c
-}
-
-#[cfg(test)]
-#[test]
-fn test_ffa_mult() {
-	const NUM0: u8 = 0b01101001;
-	const NUM1: u8 = 0b00101001;
-	const EXPECTED: u8 = 0b10000011;
-
-	assert_eq!(ffa_mul(NUM0, NUM1), EXPECTED);
 }
 
 fn mix_columns(state: u128) -> u128 {
